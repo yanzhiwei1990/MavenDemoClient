@@ -7,10 +7,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -19,24 +23,23 @@ import java.util.concurrent.Executors;
 
 import org.json.JSONObject;
 
+
 public class TcpClient {
 
 	public static final String TAG = TcpClient.class.getSimpleName() + " : %s\n";
 	private static final int MAX_THREAD = 20;
 	
-	private String mFromAddress = null;
-	private int mFromPort = -1;
-	private String mToAddress = null;
-	private int mToPort = -1;
+	private String mServerAddress = null;
+	private int mServerPort = -1;
 	private ExecutorService mExecutorService = null;
 	private Socket mClientSocket = null;
+	private String mClientMacAddress = null;
 	private boolean mIsRunning = false;
 	private InputStream mInputStream = null;
 	private OutputStream mOutputStream = null;
 	private BufferedReader mSocketReader = null;
 	private BufferedWriter mSocketWriter = null;
 	private JSONObject mClientInfomation = null;//add mac address as name
-	
 	private List<TransferConnection> mTransferConnections = Collections.synchronizedList(new ArrayList<TransferConnection>());
 	
 	private TransferConnectionCallback mTransferConnectionCallback = new TransferConnectionCallback() {
@@ -81,6 +84,14 @@ public class TcpClient {
 			if (mInputStream != null && mOutputStream != null) {
 				mSocketReader = new BufferedReader(new InputStreamReader(mInputStream, Charset.forName("UTF-8")));
 				mSocketWriter = new BufferedWriter(new OutputStreamWriter(mOutputStream));
+				//send client info to fixed request command server
+				JSONObject info = new JSONObject();
+				//add command
+				info.put("command", "information");
+				//add client information
+				info.put("information", mClientInfomation);
+				Log.PrintLog(TAG, "mReceiveRunnable " + info.toString());
+				sendMessage(info.toString());
 				String inMsg = null;
 				String outMsg = null;
 				while (mIsRunning) {
@@ -106,19 +117,17 @@ public class TcpClient {
 		}
 	};
 	
-	public TcpClient(String fromAddress, int fromPort, String toAddress, int toPort) {
-		mFromAddress = fromAddress;
-		mFromPort = fromPort;
-		mToAddress = toAddress;
-		mToPort = toPort;
+	public TcpClient(String serverAddress, int serverPort) {
+		mServerAddress = serverAddress;
+		mServerPort = serverPort;
 		mExecutorService = Executors.newFixedThreadPool(MAX_THREAD);
 	}
 	
 	public void connectToServer() {
 		try {
-			mClientSocket = new Socket(mFromAddress, mFromPort);
+			mClientSocket = new Socket(mServerAddress, mServerPort);
 			mIsRunning = true;
-			printAddress();
+			initSocketInformation();
 			mExecutorService.submit(mReceiveRunnable);
 		} catch (IOException e) {
 			Log.PrintError(TAG, "connectToServer IOException = " + e.getMessage());
@@ -128,6 +137,22 @@ public class TcpClient {
 	public void disconnectToServer() {
 		mIsRunning = false;
 		closeSocket();
+	}
+	
+	public void requestNewTransferConnection(JSONObject resuest) {
+		//request a new transfer server
+		//{"command":"start_new_transfer_server","server_info":{"new_transfer_server_address":"opendiylib.com","new_transfer_server_port":19909,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":19911}}
+		if (resuest != null && resuest.length() > 0) {
+			sendMessage(resuest.toString());
+		}
+	}
+	
+	public void stopRequestNewTransferConnection(JSONObject resuest) {
+		//request a new transfer server
+		//{"command":"stop_transfer_server","server_info":{"new_transfer_server_address":"opendiylib.com","new_transfer_server_port":19909,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":19911}}
+		if (resuest != null && resuest.length() > 0) {
+			sendMessage(resuest.toString());
+		}
 	}
 	
 	public InputStream getClientInputStream() {
@@ -158,6 +183,54 @@ public class TcpClient {
 		return mClientSocket.getLocalPort();
 	}
 	
+	public String getLocalMacAddress() {
+		String result = null;
+		if (mClientMacAddress != null && mClientMacAddress.length() > 0) {
+			result = mClientMacAddress;
+			return result;
+		}
+		InetAddress inetAddress = null;
+		byte[] macAddress = null;
+		NetworkInterface networkInterface = null;
+		String localAddress = getLocalInetAddress();
+		try {
+			inetAddress = InetAddress.getByName(localAddress);
+			Log.PrintLog(TAG, "getLocalMacAddress inetAddress = " + inetAddress.getHostAddress());
+		} catch (Exception e) {
+			Log.PrintError(TAG, "getLocalMacAddress inetAddress Exception = " + e.getMessage());
+			return result;
+		}
+		try {
+			networkInterface = NetworkInterface.getByInetAddress(inetAddress);
+			Log.PrintLog(TAG, "getLocalMacAddress networkInterface = " + networkInterface.getDisplayName());
+		} catch (Exception e) {
+			Log.PrintError(TAG, "getLocalMacAddress networkInterface Exception = " + e.getMessage());
+			return result;
+		}
+		try {
+			macAddress = networkInterface.getHardwareAddress();
+			Log.PrintLog(TAG, "getLocalMacAddress macAddress = " + Arrays.toString(macAddress));
+		} catch (Exception e) {
+			Log.PrintError(TAG, "getLocalMacAddress macAddress Exception = " + e.getMessage());
+			return result;
+		}
+		if (macAddress != null && macAddress.length > 0) {
+			StringBuilder sb = new StringBuilder();
+		    for (int i = 0; i < macAddress.length; i++) {
+		        if (i != 0) {
+		          sb.append("-");
+		        }
+		        String s = Integer.toHexString(macAddress[i] & 0xFF);
+		        sb.append(s.length() == 1 ? 0 + s : s);
+		    }
+		    if (sb != null && sb.length() > 0) {
+		    	result = sb.toString().toUpperCase();
+		    }
+		}
+		Log.PrintLog(TAG, "getLocalMacAddress result = " + result);
+	    return result;
+	}
+	
 	public String getRequestClientInetAddress() {
 		String result = null;
 		try {
@@ -178,11 +251,44 @@ public class TcpClient {
 		return result;
 	}
 	
+	private void initSocketInformation() {
+		if (mClientMacAddress == null) {
+			mClientMacAddress = getLocalMacAddress();
+		}
+		//connect to fixed server
+		//{"command":"information","information":{"name":"request_tranfer_client","mac_address":"10-7B-44-15-2D-B6","dhcp_address":"192.168.188.150","dhcp_port":19909,"fixed_server_address":"opendiylib.com","fixed_server_port":19910}}
+		if (mClientInfomation == null) {
+			JSONObject info = new JSONObject();
+			info.put("name", "request_tranfer_client");
+			info.put("mac_address", mClientMacAddress);
+			info.put("dhcp_address", getLocalInetAddress());
+			info.put("dhcp_port", getLocalPort());
+			info.put("fixed_server_address", MainDemoClient.FIXED_HOST);
+			info.put("fixed_server_port", MainDemoClient.FIXED_PORT);
+			mClientInfomation = info;
+		}
+		printClientInfo();
+	}
+	
+	private TransferConnection getTransferConnection(JSONObject object) {
+		TransferConnection result = null;
+		Iterator<TransferConnection> iterator = mTransferConnections.iterator();
+		TransferConnection transferConnection = null;
+		while (iterator.hasNext()) {
+			transferConnection = (TransferConnection)iterator.next();
+			if (object != null && object.equals(transferConnection.getRequestInformation())) {
+				result = transferConnection;
+				break;
+			}
+		}
+		return result;
+	}
+	
 	private void sendMessage(String outMsg) {
 		try {
 			if (mSocketWriter != null) {
 				mSocketWriter.write(outMsg);
-		    	mSocketWriter.write("\n");
+		    	//mSocketWriter.write("\n");
 		    	mSocketWriter.flush();
 			}
 		} catch (Exception e) {
@@ -190,10 +296,9 @@ public class TcpClient {
 		}
 	}
 	
-	private void printAddress() {
-		if (mClientSocket != null) {
-			Log.PrintLog(TAG, "server:" + getLocalInetAddress() + ":" + getLocalPort() +
-					", client:" + getRemoteInetAddress() + ":" + getRemotePort());
+	private void printClientInfo() {
+		if (mClientInfomation != null && mClientInfomation.length() > 0) {
+			Log.PrintLog(TAG, "printClientInfo:" + mClientInfomation);
 		}
 	}
 	
@@ -302,10 +407,7 @@ public class TcpClient {
 					Log.PrintError(TAG, "dealCommand getString command Exception = " + e.getMessage());
 				}
 				switch (command) {
-					case "information":
-						result = parseInformation(obj);
-						break;
-					case "connectnewserver":
+					case "start_connect":
 						result = parseConnetNewServer(obj);
 						break;
 					case "status":
@@ -319,46 +421,50 @@ public class TcpClient {
 		return result;
 	}
 	
-	private String parseInformation(JSONObject data) {
-		String result = "unknown";
-		if (data != null && data.length() > 0) {
-			mClientInfomation = data.getJSONObject("information");
-			try {
-				result = "parseInformation_" + mClientInfomation.getString("name") + "_ok";
-			} catch (Exception e) {
-				Log.PrintError(TAG, "parseInformation getString name Exception = " + e.getMessage());
-			}
-		}
-		return result;
-	}
-	
 	private String parseConnetNewServer(JSONObject data) {
 		String result = "unknown";
-		JSONObject serverObj = null;
-		String address = null;
-		int port = -1;
+		JSONObject request_client_info = null;
+		String server_address = null;
+		int server_port = -1;
+		String request_client_nat_address = null;
+		int request_client_nat_port = -1;
 		if (data != null && data.length() > 0) {
+			//request client in and tell response client to start connect to transfer server to transfer request
+			//{"command":"start_connect","request_client_info":{"request_client_nat_address":"114.82.25.165","request_client_nat_port":50000,"connected_transfer_server_address":"opendiylib.com","connected_transfer_server_port":19911,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":3389}
 			try {
-				serverObj = data.getJSONObject("server_info");
+				request_client_info = data.getJSONObject("request_client_info");
 			} catch (Exception e) {
-				Log.PrintError(TAG, "parseStartNewServer getString server_info Exception = " + e.getMessage());
+				return result;
 			}
-			if (serverObj != null && serverObj.length() > 0) {
-				try {
-					address = serverObj.getString("address");
-				} catch (Exception e) {
-					Log.PrintError(TAG, "parseStartNewServer getString address Exception = " + e.getMessage());
-				}
-				try {
-					port = serverObj.getInt("port");
-				} catch (Exception e) {
-					Log.PrintError(TAG, "parseStartNewServer getString port Exception = " + e.getMessage());
-				}
-				if (address != null && address.length() > 0 && port != -1) {
-					result = "parseConnetNewServer_" + address + ":" + port + "_ok";
-					TransferConnection transferConnection = new TransferConnection(address, port, address, port);
-					transferConnection.setTransferConnectionCallback(mTransferConnectionCallback);
-					transferConnection.startConnection();
+			try {
+				server_address = data.getString("connected_transfer_server_address");
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseStartNewServer serverObj getString connected_transfer_server_address Exception = " + e.getMessage());
+			}
+			try {
+				server_port = data.getInt("connected_transfer_server_port");
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseStartNewServer serverObj getInt connected_transfer_server_port Exception = " + e.getMessage());
+			}
+			try {
+				request_client_nat_address = data.getString("request_client_nat_address");
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseStartNewServer getString request_client_nat_address Exception = " + e.getMessage());
+			}
+			try {
+				request_client_nat_port = data.getInt("request_client_nat_port");
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseStartNewServer serverObj getInt request_client_nat_port Exception = " + e.getMessage());
+			}
+			if (server_address != null && server_address.length() > 0 && server_port != -1 && request_client_nat_address != null && request_client_nat_address.length() > 0 && request_client_nat_port != -1) {
+				TransferConnection getTransferConnection = getTransferConnection(request_client_info);
+				if (getTransferConnection == null) {
+					getTransferConnection = new TransferConnection(mExecutorService, TcpClient.this, request_client_info);
+					getTransferConnection.setTransferConnectionCallback(mTransferConnectionCallback);
+					getTransferConnection.startConnect();
+					result = "parseConnetNewServer_" + server_address + ":" + server_port + "_" + request_client_nat_address + ":" + request_client_nat_port + "_ok";
+				} else {
+					result = "parseConnetNewServer_" + server_address + ":" + server_port + "_" + request_client_nat_port + ":" + request_client_nat_port + "_existed_ok";
 				}
 			}
 		}

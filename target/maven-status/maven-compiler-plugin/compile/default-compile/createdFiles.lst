@@ -5,6 +5,7 @@ MavenDemoClient\MainDemoClient.class
 MavenDemoClient\Debug.class
 MavenDemoClient\Log.class
 MavenDemoClient\TcpClient$1.class
-MavenDemoClient\TcpClientManager.class
+MavenDemoClient\TransferClient$1.class
 MavenDemoClient\TcpClient$2.class
+MavenDemoClient\TransferClient.class
 MavenDemoClient\TcpClient$TransferConnectionCallback.class
