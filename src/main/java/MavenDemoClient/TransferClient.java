@@ -73,13 +73,13 @@ public class TransferClient {
 					//add command
 					info.put("command", "information");
 					//add client information
-					info.put("information", mClientInfomation.toString());
+					info.put("information", mClientInfomation);
 					sendMessage(info.toString());
 				}
 				while (isRunning) {
 					try {
 					    while ((length = mSocketReader.read(buffer, 0, buffer.length)) != -1) {
-					    	if (length <= 512) {
+					    	if (length <= 1024) {
 					    		try {
 					    			inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
 								} catch (Exception e) {
@@ -89,7 +89,7 @@ public class TransferClient {
 					    		outMsg = dealCommand(inMsg);
 					    		if (!"unknown".equals(outMsg)) {
 					    			Log.PrintLog(TAG, "Received from inMsg = " + inMsg + ", outMsg = " + outMsg);
-					    			sendMessage(outMsg);
+							    	sendMessage(outMsg);
 					    		}
 					    	} else {
 					    		outMsg = "unknown";
@@ -407,16 +407,30 @@ public class TransferClient {
 	
 	private String dealCommand(String data) {
 		String result = "unknown";
-		if (data != null && data.length() > 0) {
-			String checkClient = "parseInformation_" + mClientInfomation.getString("name") + "_" + mClientInfomation.getString("mac_address") + "_ok";
-			if (checkClient.equals(data)) {
-				JSONObject command = new JSONObject();
-				command.put("command", "status");
-				JSONObject status = new JSONObject();
-				status.put("status", "response_request_ok");
-				command.put("status", status.toString());
-				result = command.toString();
-				
+		String command = null;
+		JSONObject obj = null;
+		if (data != null) {
+			try {
+				obj = new JSONObject(data);
+			} catch (Exception e) {
+				//Log.PrintError(TAG, "dealCommand new JSONObject Exception = " + e.getMessage());
+			}
+			//connect to transfer server and report related infomation
+			//{"command":"information","information":{"name":"response_tranfer_client","mac_address":"10-7B-44-15-2D-B6","dhcp_address":"192.168.188.150","dhcp_port":50001,"request_client_nat_address":"114.82.25.165","request_client_nat_port":50000,"connected_transfer_server_address":"opendiylib.com","connected_transfer_server_port":19911}}
+
+			if (obj != null && obj.length() > 0) {
+				try {
+					command = obj.getString("command");
+				} catch (Exception e) {
+					//Log.PrintError(TAG, "dealCommand getString command Exception = " + e.getMessage());
+				}
+				switch (command) {
+					case "status":
+						result = parseStatus(obj);
+						break;
+					default:
+						break;
+				}
 			}
 		}
 		return result;
@@ -427,6 +441,10 @@ public class TransferClient {
 		if (data != null && data.length() > 0) {
 			try {
 				result = "parseStatus_" + mClientInfomation.getString("status") + "_ok";
+				String checkClient = "parseInformation_" + mClientInfomation.getString("name") + "_" + mClientInfomation.getString("mac_address") + "_ok";
+				if (mClientInfomation.getString("status").equals(checkClient)) {
+					mTransferConnection.startConnetToResponseServer();
+				}
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStatus getString status Exception = " + e.getMessage());
 			}

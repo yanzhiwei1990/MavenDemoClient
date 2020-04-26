@@ -1,5 +1,7 @@
 package MavenDemoClient;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -23,7 +25,6 @@ import java.util.concurrent.Executors;
 
 import org.json.JSONObject;
 
-
 public class TcpClient {
 
 	public static final String TAG = TcpClient.class.getSimpleName() + " : %s\n";
@@ -37,8 +38,8 @@ public class TcpClient {
 	private boolean mIsRunning = false;
 	private InputStream mInputStream = null;
 	private OutputStream mOutputStream = null;
-	private BufferedReader mSocketReader = null;
-	private BufferedWriter mSocketWriter = null;
+	private BufferedInputStream mSocketReader = null;
+	private BufferedOutputStream mSocketWriter = null;
 	private JSONObject mClientInfomation = null;//add mac address as name
 	private List<TransferConnection> mTransferConnections = Collections.synchronizedList(new ArrayList<TransferConnection>());
 	
@@ -82,24 +83,30 @@ public class TcpClient {
 				Log.PrintError(TAG, "getOutputStream Exception = " + e.getMessage());
 			}
 			if (mInputStream != null && mOutputStream != null) {
-				mSocketReader = new BufferedReader(new InputStreamReader(mInputStream, Charset.forName("UTF-8")));
-				mSocketWriter = new BufferedWriter(new OutputStreamWriter(mOutputStream));
+				//mSocketReader = new BufferedReader(new InputStreamReader(mInputStream, Charset.forName("UTF-8")));
+				//mSocketWriter = new BufferedWriter(new OutputStreamWriter(mOutputStream));
+				byte[] buffer = new byte[1024 * 1024];
+				int length = -1;
+				mSocketReader = new BufferedInputStream(mInputStream, buffer.length);
+				mSocketWriter = new BufferedOutputStream(mOutputStream, buffer.length);
 				//send client info to fixed request command server
 				JSONObject info = new JSONObject();
 				//add command
 				info.put("command", "information");
 				//add client information
 				info.put("information", mClientInfomation);
-				Log.PrintLog(TAG, "mReceiveRunnable " + info.toString());
+				//Log.PrintLog(TAG, "mReceiveRunnable " + info.toString());
 				sendMessage(info.toString());
 				String inMsg = null;
 				String outMsg = null;
 				while (mIsRunning) {
 					try {
-					    while ((inMsg = mSocketReader.readLine()) != null) {
-					    	Log.PrintLog(TAG, "Received from  server: " + inMsg);
+					    while ((length = mSocketReader.read(buffer, 0, buffer.length)) != -1) {
+				    		inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
+					    	Log.PrintLog(TAG, "Received from client: " + inMsg);
 					    	outMsg = dealCommand(inMsg);
-					    	sendMessage(outMsg);
+					    	//sendMessage(outMsg);
+					    	Log.PrintLog(TAG, "Received client deal: " + outMsg);
 					    }
 					    Log.PrintLog(TAG, "client disconnect");
 					   
@@ -286,9 +293,9 @@ public class TcpClient {
 	
 	private void sendMessage(String outMsg) {
 		try {
-			if (mSocketWriter != null) {
-				mSocketWriter.write(outMsg);
-		    	//mSocketWriter.write("\n");
+			if (mSocketWriter != null && outMsg != null && outMsg.length() > 0) {
+				byte[] send = outMsg.getBytes(Charset.forName("UTF-8"));
+				mSocketWriter.write(send, 0, send.length);
 		    	mSocketWriter.flush();
 			}
 		} catch (Exception e) {
@@ -437,22 +444,22 @@ public class TcpClient {
 				return result;
 			}
 			try {
-				server_address = data.getString("connected_transfer_server_address");
+				server_address = request_client_info.getString("connected_transfer_server_address");
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStartNewServer serverObj getString connected_transfer_server_address Exception = " + e.getMessage());
 			}
 			try {
-				server_port = data.getInt("connected_transfer_server_port");
+				server_port = request_client_info.getInt("connected_transfer_server_port");
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStartNewServer serverObj getInt connected_transfer_server_port Exception = " + e.getMessage());
 			}
 			try {
-				request_client_nat_address = data.getString("request_client_nat_address");
+				request_client_nat_address = request_client_info.getString("request_client_nat_address");
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStartNewServer getString request_client_nat_address Exception = " + e.getMessage());
 			}
 			try {
-				request_client_nat_port = data.getInt("request_client_nat_port");
+				request_client_nat_port = request_client_info.getInt("request_client_nat_port");
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStartNewServer serverObj getInt request_client_nat_port Exception = " + e.getMessage());
 			}
@@ -475,7 +482,21 @@ public class TcpClient {
 		String result = "unknown";
 		if (data != null && data.length() > 0) {
 			try {
-				result = "parseStatus_" + mClientInfomation.getString("status") + "_ok";
+				result = "parseStatus_" + data.getString("status") + "_ok";
+				//request a new transfer server
+				//{"command":"start_new_transfer_server","server_info":{"new_transfer_server_address":"opendiylib.com","new_transfer_server_port":19909,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":19911}}
+				
+				if (data.getString("status").equals("parseInformation_" + mClientInfomation.getString("name") + "_" + mClientInfomation.getString("mac_address") + "_ok")) {
+					JSONObject resquest = new JSONObject();
+					resquest.put("command", "start_new_transfer_server");
+					JSONObject server_info = new JSONObject();
+					server_info.put("new_transfer_server_address", /*"opendiylib.com"*/"0.0.0.0");
+					server_info.put("new_transfer_server_port", 19920);
+					server_info.put("bonded_response_server_address", getLocalInetAddress());
+					server_info.put("bonded_response_server_port", 19920);
+					resquest.put("server_info", server_info);
+					requestNewTransferConnection(resquest);
+				}
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStatus getString status Exception = " + e.getMessage());
 			}
