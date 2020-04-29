@@ -1,3 +1,188 @@
+response:
+	1-1.request fixed mainclient
+		{
+			"command":"information",
+			"information":
+				{
+					"name":"response_fixed_request_tranfer_client",
+					"mac_address","10-7B-44-15-2D-B6",
+					"dhcp_address","192.168.188.150",
+					"dhcp_port":5555,
+					"fixed_server_address":"opendiylib.com",
+					"fixed_server_port":19910,
+					"response_fixed_client_nat_address":"",
+					"response_fixed_client_nat_port":-1
+				}
+		}
+	1-2.request fixed mainclient ack
+		{
+			"command":"result",
+			"result":
+				{
+					"status":"connected_to_fixed_server",
+					"information":
+						{
+							"name":"response_fixed_request_tranfer_client",
+							"mac_address","10-7B-44-15-2D-B6",
+							"dhcp_address","192.168.188.150",
+							"dhcp_port":5555,
+							"fixed_server_address":"opendiylib.com",
+							"fixed_server_port":19910,
+							"response_fixed_client_nat_address":"58.246.136.202",
+							"response_fixed_client_nat_port":50000
+						}
+				}
+			}
+				
+		}
+		
+		2-1.request start transfer server
+			{
+				"command":"start_new_transfer_server",
+				"server_info":
+					{
+						"new_transfer_server_address":"0.0.0.0",
+						"new_transfer_server_port":19920,
+						"bonded_response_server_address","192.168.188.150"
+						"bonded_response_server_port":19920
+					}
+			}
+		
+		2-2.request start transfer server ack
+			server started
+			{
+				"command":"result",
+				"result":
+					{
+						"status":"new_transfer_server_started",
+						"server_info":
+							{
+								"new_transfer_server_address":"0.0.0.0",
+								"new_transfer_server_port":19920,
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+			
+			server exist
+			{
+				"command":"result",
+				"result":
+					{
+						"status":"transfer_server_existed",
+						"server_info":
+							{
+								"new_transfer_server_address":"0.0.0.0",
+								"new_transfer_server_port":19920,
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+		
+		2-3.request stop transfer server
+			{
+				"command":"stop_transfer_server",
+				"server_info":
+					{
+						"new_transfer_server_address":"0.0.0.0",
+						"new_transfer_server_port":19920,
+						"bonded_response_server_address","192.168.188.150"
+						"bonded_response_server_port":19920
+					}
+			}
+			
+		2-4.request stop transfer server ack
+			server stopped
+			{
+				"command":"result",
+				"result":
+					{
+						"status":"transfer_server_stopped",
+						"server_info":
+							{
+								"new_transfer_server_address":"0.0.0.0",
+								"new_transfer_server_port":19920,
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+			
+			server not found
+			{
+				"command":"result",
+				"result":
+					{
+						"status":"transfer_server_not_found",
+						"server_info":
+							{
+								"new_transfer_server_address":"0.0.0.0",
+								"new_transfer_server_port":19920,
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+
+		3-1.unknown request client received
+			
+		3-2.unknown request client received ack
+			{
+				"command":"status",
+				"status":
+					{
+						"status":"recognize_request_client",
+						"client_info":
+							{
+								"connected_server_address":"0.0.0.0",
+								"connected_server_port":19920,
+								"client_nat_address","58.246.136.202"
+								"client_nat_port":50000
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+		
+		3-3.unknown request client request response connect
+			{
+				"command":"start_connect",
+				"status":
+					{
+						"status":"recognize_request_client",
+						"client_info":
+							{
+								"connected_server_address":"0.0.0.0",
+								"connected_server_port":19920,
+								"client_nat_address","58.246.136.202"
+								"client_nat_port":50000
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+				}
+					
+			}
+
+{"command":"command","role":"request","action":"start_connect","address":"0.0.0.0","port":"19909","server_address":"0.0.0.0","server_port":"19909"}
+
+{"command":"information","information":{"name":"testresponse","request_client_address":"127.0.0.1","request_client_port":}}
+
+{"command":"information","information":{"name":"testresponse","request_client_address":"58.246.136.202","request_client_port":62944}}
+
+
 //connect to fixed server
 //{"command":"information","information":{"name":"request_tranfer_client","mac_address":"10-7B-44-15-2D-B6","dhcp_address":"192.168.188.150","dhcp_port":19909,"fixed_server_address":"opendiylib.com","fixed_server_port":19910}}
 

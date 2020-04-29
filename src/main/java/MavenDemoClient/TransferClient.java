@@ -87,7 +87,7 @@ public class TransferClient {
 									Log.PrintError(TAG, "parse first 256 bytes error");
 								}
 					    		outMsg = dealCommand(inMsg);
-					    		if (!"unknown".equals(outMsg)) {
+					    		if (!"no_need_feedback".equals(outMsg)) {
 					    			Log.PrintLog(TAG, "Received from inMsg = " + inMsg + ", outMsg = " + outMsg);
 							    	sendMessage(outMsg);
 					    		}
@@ -124,9 +124,9 @@ public class TransferClient {
 		}
 	};
 	
-	public TransferClient(ExecutorService executor, TransferConnection transferConnection, String serverAddress, int serverPort) {
-		mServerAddress = serverAddress;
-		mServerPort = serverPort;
+	public TransferClient(ExecutorService executor, TransferConnection transferConnection, JSONObject transferServerInformation) {
+		mServerAddress = transferConnection.getTransferServerAddress();
+		mServerPort = transferConnection.getTransferServerPort();
 		mExecutorService = executor;
 		mTransferConnection = transferConnection;
 	}
@@ -256,31 +256,78 @@ public class TransferClient {
 			mClientMacAddress = getLocalMacAddress();
 		}
 		//connect to transfer server and report related infomation
-		//{"command":"information","information":{"name":"response_tranfer_client","mac_address":"10-7B-44-15-2D-B6","dhcp_address":"192.168.188.150","dhcp_port":50001,"request_client_nat_address":"114.82.25.165","request_client_nat_port":50000,"connected_transfer_server_address":"opendiylib.com","connected_transfer_server_port":19911}}
+		/*
+		{
+				"command":"information",
+				"information":
+					{
+						"client_info":
+							{
+								"name":"response_fixed_request_tranfer_client",
+								"mac_address","10-7B-44-15-2D-B6",
+								"client_role","request",
+								"request_client_nat_address","58.246.136.202",
+								"request_client_nat_port":5555,
+								"dhcp_address","192.168.188.150",
+								"dhcp_port":5555,
+								"fixed_server_address":"opendiylib.com",
+								"fixed_server_port":19910,
+								"connected_transfer_server_address":"www.opendiylib.com",
+								"connected_transfer_server_port":19920,
+								"connected_server_address":"www.opendiylib.com",
+								"connected_server_port":19920
+							},
+						"server_info":
+							{
+								"connected_transfer_server_address":"www.opendiylib.com",
+								"connected_transfer_server_port":19920,
+								"request_client_nat_address":"58.246.136.202",
+								"request_client_nat_port":50000,
+								"bonded_response_server_address","192.168.188.150"
+								"bonded_response_server_port":19920
+							}
+					}
+			} 
+		*/
 		if (mClientInfomation == null) {
 			JSONObject info = new JSONObject();
 			if (ROLE_REQUEST.equals(mClientRole)) {
 				info.put("name", "response_request_client");
 				info.put("mac_address", mClientMacAddress);
-				info.put("request_client_nat_address", mTransferConnection.getRequestNatAddress());
-				info.put("request_client_nat_port", mTransferConnection.getRequestNatPort());
+				info.put("client_role", ROLE_REQUEST);
+				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
+				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
 				info.put("dhcp_address", getLocalInetAddress());
 				info.put("dhcp_port", getLocalPort());
-				info.put("connected_transfer_server_address", MainDemoClient.FIXED_HOST);
-				info.put("connected_transfer_server_port", getRemotePort());
+				info.put("connected_transfer_server_address", mTransferConnection.getTransferServerAddress());
+				info.put("connected_transfer_server_port", mTransferConnection.getTransferServerPort());
+				//transfer server
+				info.put("connected_server_address", MainDemoClient.FIXED_HOST);
+				info.put("connected_server_port", getRemotePort());
 			} else {
 				info.put("name", "response_response_client");
 				info.put("mac_address", mClientMacAddress);
-				info.put("request_client_nat_address", mTransferConnection.getRequestNatAddress());
-				info.put("request_client_nat_port", mTransferConnection.getRequestNatPort());
+				info.put("client_role", ROLE_REPONSE);
+				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
+				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
 				info.put("dhcp_address", getLocalInetAddress());
 				info.put("dhcp_port", getLocalPort());
 				info.put("connected_transfer_server_address", MainDemoClient.FIXED_HOST);
 				info.put("connected_transfer_server_port", getRemotePort());
+				//local server
+				info.put("connected_server_address", getRemoteInetAddress());
+				info.put("connected_server_port", getRemotePort());
 			}
 			mClientInfomation = info;
 		}
 		printClientInfo();
+	}
+	
+	private void sendClientInfomation() {
+		JSONObject info = new JSONObject();
+		info.put("command", "information");
+		info.put("information", mClientInfomation);
+		sendMessage(info.toString());
 	}
 	
 	private void sendMessage(String outMsg) {

@@ -12,14 +12,14 @@ public class TransferConnection {
 	
 	private TransferConnectionCallback mTransferConnectionCallback = null;
 	private TcpClient mTcpClient = null;
-	private JSONObject mRequestInformation = null;
+	private JSONObject mTransferServerInformation = null;
 	private TransferClient mFromTransferClient = null;
 	private TransferClient mToTransferClient = null;
 	private ExecutorService mExecutorService = null;
 	
 	public TransferConnection(ExecutorService executor, TcpClient client, JSONObject object) {
 		mTcpClient = client;
-		mRequestInformation = object;
+		mTransferServerInformation = object;
 		mExecutorService = executor;
 	}
 	
@@ -29,7 +29,7 @@ public class TransferConnection {
 	
 	public void startConnect() {
 		if (mFromTransferClient == null) {
-			mFromTransferClient = new TransferClient(mExecutorService, this, getFromAddress(), getFromPort());
+			mFromTransferClient = new TransferClient(mExecutorService, this, mTransferServerInformation);
 			mFromTransferClient.setClientRole(TransferClient.ROLE_REQUEST);
 		}
 		mFromTransferClient.connectToServer();
@@ -37,7 +37,7 @@ public class TransferConnection {
 	
 	public void startConnetToResponseServer() {
 		if (mToTransferClient == null) {
-			mToTransferClient = new TransferClient(mExecutorService, this, getToAddress(), getToPort());
+			mToTransferClient = new TransferClient(mExecutorService, this, mTransferServerInformation);
 			mToTransferClient.setClientRole(TransferClient.ROLE_REPONSE);
 		}
 		mToTransferClient.connectToServer();
@@ -60,82 +60,93 @@ public class TransferConnection {
 		return mToTransferClient;
 	}
 	
-	public JSONObject getRequestInformation() {
-		return mRequestInformation;
+	public JSONObject getTransferServerInformation() {
+		return mTransferServerInformation;
 	}
 	
-	public String getRequestNatAddress() {
+	public String getOrinalRequestNatAddress() {
 		String result = null;
 		//request client in and tell response client to start connect to transfer server to transfer request
-		//{"command":"start_connect","request_client_info":{"request_client_nat_address":"114.82.25.165","request_client_nat_port":50000,"connected_transfer_server_address":"opendiylib.com","connected_transfer_server_port":19911,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":3389}
+		/*
+		{
+				"command":"start_connect_transfer",
+				"server_info":
+					{
+						"connected_transfer_server_address":"www.opendiylib.com",
+						"connected_transfer_server_port":19920,
+						"request_client_nat_address":"58.246.136.202",
+						"request_client_nat_port":50000,
+						"bonded_response_server_address","192.168.188.150"
+						"bonded_response_server_port":19920
+					}
+			} 
+		*/
 		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getString("request_client_nat_address");
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getString("request_client_nat_address");
 			}
 		} catch (Exception e) {
-			Log.PrintError(TAG, "getRequestNatAddress Exception = " + e.getMessage());
+			Log.PrintError(TAG, "getOrinalRequestNatAddress Exception = " + e.getMessage());
 		}
 		return result;
 	}
 	
-	public int getRequestNatPort() {
+	public int getOrinalRequestNatPort() {
 		int result = -1;
 		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getInt("request_client_nat_port");
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getInt("request_client_nat_port");
 			}
 		} catch (Exception e) {
-			Log.PrintError(TAG, "getRequestNatPort Exception = " + e.getMessage());
+			Log.PrintError(TAG, "getOrinalRequestNatPort Exception = " + e.getMessage());
 		}
 		return result;
 	}
 	
-	public String getFromAddress() {
-		String result = null;
-		//request client in and tell response client to start connect to transfer server to transfer request
-		//{"command":"start_connect","request_client_info":{"request_client_nat_address":"114.82.25.165","request_client_nat_port":50000,"connected_transfer_server_address":"opendiylib.com","connected_transfer_server_port":19911,"bonded_response_server_address":"192.168.188.150","bonded_response_server_port":3389}
-		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getString("connected_transfer_server_address");
-			}
-		} catch (Exception e) {
-			Log.PrintError(TAG, "getFromAddress Exception = " + e.getMessage());
-		}
-		return result;
-	}
-	
-	public int getFromPort() {
-		int result = -1;
-		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getInt("connected_transfer_server_port");
-			}
-		} catch (Exception e) {
-			Log.PrintError(TAG, "getFromPort Exception = " + e.getMessage());
-		}
-		return result;
-	}
-	
-	public String getToAddress() {
+	public String getTransferServerAddress() {
 		String result = null;
 		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getString("bonded_response_server_address");
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getString("connected_transfer_server_address");
 			}
 		} catch (Exception e) {
-			Log.PrintError(TAG, "getToAddress Exception = " + e.getMessage());
+			Log.PrintError(TAG, "getTransferServerAddress Exception = " + e.getMessage());
 		}
 		return result;
 	}
 	
-	public int getToPort() {
+	public int getTransferServerPort() {
 		int result = -1;
 		try {
-			if (mRequestInformation != null) {
-				result = mRequestInformation.getInt("bonded_response_server_port");
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getInt("connected_transfer_server_port");
 			}
 		} catch (Exception e) {
-			Log.PrintError(TAG, "getToPort Exception = " + e.getMessage());
+			Log.PrintError(TAG, "getTransferServerPort Exception = " + e.getMessage());
+		}
+		return result;
+	}
+	
+	public String getResponseServerAddress() {
+		String result = null;
+		try {
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getString("bonded_response_server_address");
+			}
+		} catch (Exception e) {
+			Log.PrintError(TAG, "getResponseServerAddress Exception = " + e.getMessage());
+		}
+		return result;
+	}
+	
+	public int getResponseServerPort() {
+		int result = -1;
+		try {
+			if (mTransferServerInformation != null) {
+				result = mTransferServerInformation.getInt("bonded_response_server_port");
+			}
+		} catch (Exception e) {
+			Log.PrintError(TAG, "getResponseServerPort Exception = " + e.getMessage());
 		}
 		return result;
 	}
