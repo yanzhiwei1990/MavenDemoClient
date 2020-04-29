@@ -67,15 +67,8 @@ public class TransferClient {
 				int length = -1;
 				mSocketReader = new BufferedInputStream(mInputStream, buffer.length);
 				mSocketWriter = new BufferedOutputStream(mOutputStream, buffer.length);
-				if (ROLE_REQUEST.equals(mClientRole)) {
-					//send response request client to transfer server
-					JSONObject info = new JSONObject();
-					//add command
-					info.put("command", "information");
-					//add client information
-					info.put("information", mClientInfomation);
-					sendMessage(info.toString());
-				}
+				//send response request/response client to transfer server
+				sendClientInfomation();
 				while (isRunning) {
 					try {
 					    while ((length = mSocketReader.read(buffer, 0, buffer.length)) != -1) {
@@ -96,6 +89,23 @@ public class TransferClient {
 					    	}
 					    	Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
 					    	if ("unknown".equals(outMsg)) {
+					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.getToTransferClient() == null) {
+					    			mTransferConnection.startConnetToResponseServer();
+					    			int count = 30;
+					    			while (!mTransferConnection.getToTransferClient().isRunning()) {
+					    				delayMs(1000);
+					    				count--;
+					    				if (count < 0) {
+					    					Log.PrintLog(TAG, "wait response server 30s time out");
+					    					break;
+					    				}
+										
+									}
+					    			if (count < 0) {
+					    				Log.PrintLog(TAG, "stop request client as time out");
+					    				break;
+					    			}
+					    		}
 					    		if (mTransferConnection.getFromTransferClient() != null && mTransferConnection.getToTransferClient() != null) {
 					    			switch (mClientRole) {
 						    			case ROLE_REQUEST:
@@ -145,6 +155,10 @@ public class TransferClient {
 	public void disconnectToServer() {
 		mIsRunning = false;
 		closeSocket();
+	}
+	
+	public boolean isRunning() {
+		return isRunning;
 	}
 	
 	public void setClientRole(String role) {
@@ -304,6 +318,8 @@ public class TransferClient {
 				//transfer server
 				info.put("connected_server_address", MainDemoClient.FIXED_HOST);
 				info.put("connected_server_port", getRemotePort());
+				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
+				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
 			} else {
 				info.put("name", "response_response_client");
 				info.put("mac_address", mClientMacAddress);
@@ -317,6 +333,8 @@ public class TransferClient {
 				//local server
 				info.put("connected_server_address", getRemoteInetAddress());
 				info.put("connected_server_port", getRemotePort());
+				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
+				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
 			}
 			mClientInfomation = info;
 		}
@@ -472,6 +490,9 @@ public class TransferClient {
 					//Log.PrintError(TAG, "dealCommand getString command Exception = " + e.getMessage());
 				}
 				switch (command) {
+					case "result":
+						result = parseResult(obj);
+						break;
 					case "status":
 						result = parseStatus(obj);
 						break;
@@ -489,12 +510,108 @@ public class TransferClient {
 			try {
 				result = "parseStatus_" + mClientInfomation.getString("status") + "_ok";
 				String checkClient = "parseInformation_" + mClientInfomation.getString("name") + "_" + mClientInfomation.getString("mac_address") + "_ok";
-				if (mClientInfomation.getString("status").equals(checkClient)) {
-					mTransferConnection.startConnetToResponseServer();
-				}
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseStatus getString status Exception = " + e.getMessage());
 			}
+		}
+		return result;
+	}
+	
+	private String parseResult(JSONObject data) {
+		String result = "unknown";
+		JSONObject resultJson = null;
+		if (data != null && data.length() > 0) {
+			/*
+			{
+				"command":"result",
+				"result":
+					{
+						"status":"connected_to_transfer_server",
+						"information":
+							{
+								"name":"response_request_client",
+								"mac_address":"10-7B-44-15-2D-B6",
+								"client_role":"request",
+								"request_client_nat_address","58.246.136.202",
+								"request_client_nat_port":5555,
+								"dhcp_address","192.168.188.150",
+								"dhcp_port":5555,
+								"connected_transfer_server_address":"opendiylib.com",
+								"connected_transfer_server_port":19920,
+								"connected_server_address":"opendiylib.com",
+								"connected_server_port":19920,
+								"bonded_response_server_address","192.168.188.150",
+								"bonded_response_server_port":19920
+								"nat_address","58.246.136.202",
+								"nat_port":55555
+							}
+					}
+				}
+					
+			}
+			*/
+			try {
+				resultJson = data.getJSONObject("result");
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseResult getString result Exception = " + e.getMessage());
+				return result;
+			}
+			String returnStatus = null;
+			try {
+				returnStatus = resultJson.getString("status");
+			} catch (Exception e) {
+				return result;
+			}
+			switch (returnStatus) {
+				case "connected_to_transfer_server":
+					JSONObject returnInfo = null;
+					try {
+						returnInfo = resultJson.getJSONObject("information");
+					} catch (Exception e) {
+						Log.PrintError(TAG, "parseResult getString information Exception = " + e.getMessage());
+					}
+					if (returnInfo != null && returnInfo.length() > 0) {
+						String natAddress= tryToGetString(returnInfo, "nat_address");
+						int natPort = tryToGetInt(returnInfo, "nat_port");
+						//update nat address
+						mClientInfomation.put("nat_address", natAddress);
+						mClientInfomation.put("nat_port", natPort);
+						Log.PrintLog(TAG, "parseResult connected_to_fixed_server and update client info");
+					}
+					break;
+				default:
+					break;
+			}
+			try {
+				result = "no_need_feedback";
+				Log.PrintLog(TAG, "parseResult " + resultJson);
+			} catch (Exception e) {
+				Log.PrintError(TAG, "parseResult deal result Exception = " + e.getMessage());
+			}
+		}
+		return result;
+	}
+	
+	private String tryToGetString(JSONObject obj, String key) {
+		String result = null;
+		try {
+			if (obj != null && obj.length() > 0) {
+				result = obj.getString(key);
+			}
+		} catch (Exception e) {
+			Log.PrintError(TAG, "tryToGetString getString " + key + ", Exception " + e.getMessage());
+		}
+		return result;
+	}
+	
+	private int tryToGetInt(JSONObject obj, String key) {
+		int result = -1;
+		try {
+			if (obj != null && obj.length() > 0) {
+				result = obj.getInt(key);
+			}
+		} catch (Exception e) {
+			Log.PrintError(TAG, "tryToGetInt getInt " + key + ", Exception " + e.getMessage());
 		}
 		return result;
 	}

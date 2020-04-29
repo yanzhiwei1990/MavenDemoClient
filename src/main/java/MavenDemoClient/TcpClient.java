@@ -502,12 +502,10 @@ public class TcpClient {
 					getTransferConnection = new TransferConnection(mExecutorService, TcpClient.this, server_info);
 					getTransferConnection.setTransferConnectionCallback(mTransferConnectionCallback);
 					getTransferConnection.startConnect();
-					result = "parseConnetNewServer" + server_address + ":" + server_port + "_" + request_client_nat_address + ":" + request_client_nat_port + "_ok";
-				} else {
-					result = "parseConnetNewServer" + server_address + ":" + server_port + "_" + request_client_nat_address + ":" + request_client_nat_port + "_existed_ok";
 				}
 			}
 		}
+		result = "no_need_feedback";
 		return result;
 	}
 	
@@ -622,6 +620,7 @@ public class TcpClient {
 						//update nat address
 						mClientInfomation.put("response_fixed_client_nat_address", returnResponseFixedClientNatAddress);
 						mClientInfomation.put("response_fixed_client_nat_port", returnResponseFixedClientNatPort);
+						testRequestTransferServer();
 						Log.PrintLog(TAG, "parseResult connected_to_fixed_server and update client info");
 					}
 					break;
