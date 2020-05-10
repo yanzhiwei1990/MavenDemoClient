@@ -16,6 +16,8 @@ public class TransferConnection {
 	private TransferClient mFromTransferClient = null;
 	private TransferClient mToTransferClient = null;
 	private ExecutorService mExecutorService = null;
+	public TransferClient mRequestTransferClient = null;
+	public TransferClient mResponseTransferClient = null;
 	
 	public TransferConnection(ExecutorService executor, TcpClient client, JSONObject object) {
 		mTcpClient = client;

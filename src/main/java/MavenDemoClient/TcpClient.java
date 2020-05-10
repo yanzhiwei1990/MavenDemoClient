@@ -28,7 +28,7 @@ import org.json.JSONObject;
 public class TcpClient {
 
 	public static final String TAG = TcpClient.class.getSimpleName() + " : %s\n";
-	private static final int MAX_THREAD = 20;
+	private static final int MAX_THREAD = 100;
 	
 	private String mServerAddress = null;
 	private int mServerPort = -1;
@@ -100,7 +100,7 @@ public class TcpClient {
 				    		inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
 					    	Log.PrintLog(TAG, "Received from client: " + inMsg);
 					    	outMsg = dealCommand(inMsg);
-					    	if (!"no_need_feedback".equals(outMsg)) {
+					    	if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
 						    	sendMessage(outMsg);
 					    	}
 					    	Log.PrintLog(TAG, "Received client deal: " + outMsg);

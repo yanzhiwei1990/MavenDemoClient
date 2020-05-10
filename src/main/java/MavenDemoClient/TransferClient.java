@@ -42,7 +42,6 @@ public class TransferClient {
 	private BufferedOutputStream mSocketWriter = null;
 	private JSONObject mClientInfomation = null;//add mac address as name
 	private String mClientMacAddress = null;
-	private boolean isRunning = false;
 	private boolean mRecognised = false;
 	private String mClientRole = null;
 	
@@ -61,6 +60,7 @@ public class TransferClient {
 				Log.PrintError(TAG, "accept getOutputStream Exception = " + e.getMessage());
 			}
 			if (mInputStream != null && mOutputStream != null) {
+				Log.PrintLog(TAG, "receive 0000");
 				String inMsg = null;
 				String outMsg = null;
 				byte[] buffer = new byte[1024 * 1024];
@@ -68,10 +68,19 @@ public class TransferClient {
 				mSocketReader = new BufferedInputStream(mInputStream, buffer.length);
 				mSocketWriter = new BufferedOutputStream(mOutputStream, buffer.length);
 				//send response request/response client to transfer server
+				initSocketInformation();
 				sendClientInfomation();
-				while (isRunning) {
+				Log.PrintLog(TAG, "receive sendClientInfomation " + mIsRunning);
+				while (mIsRunning) {
+					Log.PrintLog(TAG, "receive while isRunning");
 					try {
-					    while ((length = mSocketReader.read(buffer, 0, buffer.length)) != -1) {
+					    while (true) {
+					    	Log.PrintLog(TAG, "receive while true");
+					    	length = mSocketReader.read(buffer, 0, buffer.length);
+					    	if (length == -1) {
+					    		Log.PrintLog(TAG, "receive length == -1");
+					    		break;
+					    	}
 					    	if (length <= 1024) {
 					    		try {
 					    			inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
@@ -80,56 +89,68 @@ public class TransferClient {
 									Log.PrintError(TAG, "parse first 256 bytes error");
 								}
 					    		outMsg = dealCommand(inMsg);
-					    		if (!"no_need_feedback".equals(outMsg)) {
-					    			Log.PrintLog(TAG, "Received from inMsg = " + inMsg + ", outMsg = " + outMsg);
+					    		if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
+					    			Log.PrintLog(TAG, "Received dealt outMsg = " + outMsg);
 							    	sendMessage(outMsg);
 					    		}
 					    	} else {
 					    		outMsg = "unknown";
 					    	}
-					    	Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
+					    	Log.PrintLog(TAG, "receive 1111 " + mClientRole);
+					    	//Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
 					    	if ("unknown".equals(outMsg)) {
-					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.getToTransferClient() == null) {
-					    			mTransferConnection.startConnetToResponseServer();
-					    			int count = 30;
-					    			while (!mTransferConnection.getToTransferClient().isRunning()) {
-					    				delayMs(1000);
+					    		Log.PrintLog(TAG, "receive unknown");
+					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.mResponseTransferClient == null) {
+					    			Log.PrintLog(TAG, "receive 2222");
+					    			int count = 50;
+					    			while (mTransferConnection.mResponseTransferClient == null) {
+					    				Log.PrintLog(TAG, "wait response server");
+					    				delayMs(100);
 					    				count--;
 					    				if (count < 0) {
 					    					Log.PrintLog(TAG, "wait response server 30s time out");
 					    					break;
 					    				}
-										
 									}
 					    			if (count < 0) {
 					    				Log.PrintLog(TAG, "stop request client as time out");
 					    				break;
+					    			} else {
+					    				Log.PrintLog(TAG, "request time out count = " + count);
 					    			}
+					    		} else {
+					    			Log.PrintLog(TAG, "receive found getToTransferClient");
 					    		}
-					    		if (mTransferConnection.getFromTransferClient() != null && mTransferConnection.getToTransferClient() != null) {
+					    		if (mTransferConnection.mRequestTransferClient != null && mTransferConnection.mResponseTransferClient != null) {
+					    			Log.PrintLog(TAG, "receive 3333 " + mClientRole);
 					    			switch (mClientRole) {
 						    			case ROLE_REQUEST:
-						    				mTransferConnection.getToTransferClient().transferBuffer(buffer, 0, length);
+						    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
 						    				break;
 						    			case ROLE_REPONSE:
-						    				mTransferConnection.getFromTransferClient().transferBuffer(buffer, 0, length);
+						    				mTransferConnection.mRequestTransferClient.transferBuffer(buffer, 0, length);
 						    				break;
 					    			}
+					    		} else {
+					    			Log.PrintLog(TAG, "receive not found both client");
 					    		}
+					    	} else {
+					    		Log.PrintLog(TAG, "receive not unkown");
 					    	}
 					    }
-					    Log.PrintLog(TAG, "startListener disconnect");
+					    Log.PrintLog(TAG, "startListener disconnect " + mClientRole);
 					} catch(Exception e) {
 						Log.PrintError(TAG, "accept Exception = " + e.getMessage());
 						e.printStackTrace();
 						break;
 					}
+					Log.PrintLog(TAG, "receive while isRunning break");
 					break;
 				}
 			} else {
 				Log.PrintError(TAG, "accept get stream error");
 			}
-			Log.PrintLog(TAG, "stop accept");
+			Log.PrintLog(TAG, "stop accept " + mClientRole);
 			dealClearWork();
 		}
 	};
@@ -145,7 +166,6 @@ public class TransferClient {
 		try {
 			mClientSocket = new Socket(mServerAddress, mServerPort);
 			mIsRunning = true;
-			initSocketInformation();
 			mExecutorService.submit(mStartListener);
 		} catch (IOException e) {
 			Log.PrintError(TAG, "connectToServer IOException = " + e.getMessage());
@@ -158,7 +178,7 @@ public class TransferClient {
 	}
 	
 	public boolean isRunning() {
-		return isRunning;
+		return mIsRunning;
 	}
 	
 	public void setClientRole(String role) {
@@ -289,7 +309,9 @@ public class TransferClient {
 								"connected_transfer_server_address":"www.opendiylib.com",
 								"connected_transfer_server_port":19920,
 								"connected_server_address":"www.opendiylib.com",
-								"connected_server_port":19920
+								"connected_server_port":19920,
+								"nat_address":"",
+								"nat_port":-1
 							},
 						"server_info":
 							{
@@ -320,6 +342,8 @@ public class TransferClient {
 				info.put("connected_server_port", getRemotePort());
 				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
 				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
+				info.put("nat_address", "");
+				info.put("nat_port", -1);
 			} else {
 				info.put("name", "response_response_client");
 				info.put("mac_address", mClientMacAddress);
@@ -335,6 +359,8 @@ public class TransferClient {
 				info.put("connected_server_port", getRemotePort());
 				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
 				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
+				info.put("nat_address", "");
+				info.put("nat_port", -1);
 			}
 			mClientInfomation = info;
 		}
@@ -563,7 +589,7 @@ public class TransferClient {
 				return result;
 			}
 			switch (returnStatus) {
-				case "connected_to_transfer_server":
+				case "request_response_connected_to_transfer_server":
 					JSONObject returnInfo = null;
 					try {
 						returnInfo = resultJson.getJSONObject("information");
@@ -577,7 +603,15 @@ public class TransferClient {
 						mClientInfomation.put("nat_address", natAddress);
 						mClientInfomation.put("nat_port", natPort);
 						Log.PrintLog(TAG, "parseResult connected_to_fixed_server and update client info");
+						if (mTransferConnection.mResponseTransferClient == null) {
+							mTransferConnection.startConnetToResponseServer();
+						} else {
+							Log.PrintLog(TAG, "parseResult connected to responseServer already");
+						}
 					}
+					break;
+				case "request_request_connected_to_transfer_server":
+					
 					break;
 				default:
 					break;
