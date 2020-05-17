@@ -152,4 +152,10 @@ public class TransferConnection {
 		}
 		return result;
 	}
+	
+	@Override
+	public String toString() {
+		String result = getOrinalRequestNatAddress() + ":" + getOrinalRequestNatPort() + "->(" + getTransferServerAddress() + ":" + getTransferServerPort() + ")->" + getResponseServerAddress() + ":" + getResponseServerPort();
+		return result;
+	}
 }

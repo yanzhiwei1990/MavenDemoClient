@@ -69,7 +69,14 @@ public class TransferClient {
 				mSocketWriter = new BufferedOutputStream(mOutputStream, buffer.length);
 				//send response request/response client to transfer server
 				initSocketInformation();
-				sendClientInfomation();
+				if (ROLE_REQUEST.equals(mClientRole)) {
+					sendClientInfomation();
+					mTransferConnection.mRequestTransferClient = TransferClient.this;
+				} else if (ROLE_REPONSE.equals(mClientRole)) {
+					mTransferConnection.mResponseTransferClient = TransferClient.this;
+				} else {
+					Log.PrintLog(TAG, "startListener other role");
+				}
 				Log.PrintLog(TAG, "receive sendClientInfomation " + mIsRunning);
 				while (mIsRunning) {
 					Log.PrintLog(TAG, "receive while isRunning");
@@ -89,22 +96,22 @@ public class TransferClient {
 									Log.PrintError(TAG, "parse first 256 bytes error");
 								}
 					    		outMsg = dealCommand(inMsg);
-					    		if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
+					    		/*if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
 					    			Log.PrintLog(TAG, "Received dealt outMsg = " + outMsg);
 							    	sendMessage(outMsg);
-					    		}
+					    		}*/
 					    	} else {
 					    		outMsg = "unknown";
 					    	}
-					    	Log.PrintLog(TAG, "receive 1111 " + mClientRole);
+					    	//Log.PrintLog(TAG, "receive 1111 " + mClientRole);
 					    	//Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
 					    	if ("unknown".equals(outMsg)) {
-					    		Log.PrintLog(TAG, "receive unknown");
+					    		Log.PrintLog(TAG, "receive unknown " + TransferClient.this);
 					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.mResponseTransferClient == null) {
-					    			Log.PrintLog(TAG, "receive 2222");
+					    			//Log.PrintLog(TAG, "receive 2222");
 					    			int count = 50;
 					    			while (mTransferConnection.mResponseTransferClient == null) {
-					    				Log.PrintLog(TAG, "wait response server");
+					    				Log.PrintLog(TAG, "wait response server" + TransferClient.this);
 					    				delayMs(100);
 					    				count--;
 					    				if (count < 0) {
@@ -113,16 +120,16 @@ public class TransferClient {
 					    				}
 									}
 					    			if (count < 0) {
-					    				Log.PrintLog(TAG, "stop request client as time out");
+					    				Log.PrintLog(TAG, "stop request client as time out" + TransferClient.this);
 					    				break;
 					    			} else {
 					    				Log.PrintLog(TAG, "request time out count = " + count);
 					    			}
 					    		} else {
-					    			Log.PrintLog(TAG, "receive found getToTransferClient");
+					    			Log.PrintLog(TAG, "receive found getToTransferClient" + TransferClient.this);
 					    		}
 					    		if (mTransferConnection.mRequestTransferClient != null && mTransferConnection.mResponseTransferClient != null) {
-					    			Log.PrintLog(TAG, "receive 3333 " + mClientRole);
+					    			Log.PrintLog(TAG, "receive " + TransferClient.this);
 					    			switch (mClientRole) {
 						    			case ROLE_REQUEST:
 						    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
@@ -130,15 +137,18 @@ public class TransferClient {
 						    			case ROLE_REPONSE:
 						    				mTransferConnection.mRequestTransferClient.transferBuffer(buffer, 0, length);
 						    				break;
+						    			default:
+						    				Log.PrintLog(TAG, "receive transfer unkown role");
+						    				break;
 					    			}
 					    		} else {
-					    			Log.PrintLog(TAG, "receive not found both client");
+					    			Log.PrintLog(TAG, "receive not found both client " + TransferClient.this);
 					    		}
 					    	} else {
-					    		Log.PrintLog(TAG, "receive not unkown");
+					    		Log.PrintLog(TAG, "receive not unkown" + TransferClient.this);
 					    	}
 					    }
-					    Log.PrintLog(TAG, "startListener disconnect " + mClientRole);
+					    Log.PrintLog(TAG, "startListener disconnect " + TransferClient.this);
 					} catch(Exception e) {
 						Log.PrintError(TAG, "accept Exception = " + e.getMessage());
 						e.printStackTrace();
@@ -150,14 +160,12 @@ public class TransferClient {
 			} else {
 				Log.PrintError(TAG, "accept get stream error");
 			}
-			Log.PrintLog(TAG, "stop accept " + mClientRole);
+			Log.PrintLog(TAG, "stop accept " + TransferClient.this);
 			dealClearWork();
 		}
 	};
 	
 	public TransferClient(ExecutorService executor, TransferConnection transferConnection, JSONObject transferServerInformation) {
-		mServerAddress = transferConnection.getTransferServerAddress();
-		mServerPort = transferConnection.getTransferServerPort();
 		mExecutorService = executor;
 		mTransferConnection = transferConnection;
 	}
@@ -183,6 +191,15 @@ public class TransferClient {
 	
 	public void setClientRole(String role) {
 		mClientRole = role;
+		if (ROLE_REQUEST.equals(mClientRole)) {
+			mServerAddress = mTransferConnection.getTransferServerAddress();
+			mServerPort = mTransferConnection.getTransferServerPort();
+		} else if (ROLE_REPONSE.equals(mClientRole)) {
+			mServerAddress = mTransferConnection.getResponseServerAddress();
+			mServerPort = mTransferConnection.getResponseServerPort();
+		} else {
+			Log.PrintLog(TAG, "TransferClient other role");
+		}
 	}
 	
 	public String getClientRole() {
@@ -217,10 +234,30 @@ public class TransferClient {
 		return mClientSocket.getLocalPort();
 	}
 	
+	public String getNatAddress() {
+		String result = null;
+		try {
+			result = mClientInfomation.getString("nat_address");
+		} catch (Exception e) {
+			//Log.PrintError(TAG, "getNatAddress Exception = " + e.getMessage());
+		}
+		return result;
+	}
+	
+	public int getNatPort() {
+		int result = -1;
+		try {
+			result = mClientInfomation.getInt("nat_port");
+		} catch (Exception e) {
+			//Log.PrintError(TAG, "getNatPort Exception = " + e.getMessage());
+		}
+		return result;
+	}
+	
 	public String getRequestClientInetAddress() {
 		String result = null;
 		try {
-			result = mClientInfomation.getString("request_client_address");
+			result = mClientInfomation.getString("request_client_nat_address");
 		} catch (Exception e) {
 			//Log.PrintError(TAG, "getRequestClientInetAddress Exception = " + e.getMessage());
 		}
@@ -230,7 +267,7 @@ public class TransferClient {
 	public int getRequestClientPort() {
 		int result = -1;
 		try {
-			result = mClientInfomation.getInt("request_client_port");
+			result = mClientInfomation.getInt("request_client_nat_port");
 		} catch (Exception e) {
 			//Log.PrintError(TAG, "getRequestClientPort Exception = " + e.getMessage());
 		}
@@ -295,33 +332,23 @@ public class TransferClient {
 				"command":"information",
 				"information":
 					{
-						"client_info":
-							{
-								"name":"response_fixed_request_tranfer_client",
-								"mac_address","10-7B-44-15-2D-B6",
-								"client_role","request",
-								"request_client_nat_address","58.246.136.202",
-								"request_client_nat_port":5555,
-								"dhcp_address","192.168.188.150",
-								"dhcp_port":5555,
-								"fixed_server_address":"opendiylib.com",
-								"fixed_server_port":19910,
-								"connected_transfer_server_address":"www.opendiylib.com",
-								"connected_transfer_server_port":19920,
-								"connected_server_address":"www.opendiylib.com",
-								"connected_server_port":19920,
-								"nat_address":"",
-								"nat_port":-1
-							},
-						"server_info":
-							{
-								"connected_transfer_server_address":"www.opendiylib.com",
-								"connected_transfer_server_port":19920,
-								"request_client_nat_address":"58.246.136.202",
-								"request_client_nat_port":50000,
-								"bonded_response_server_address","192.168.188.150"
-								"bonded_response_server_port":19920
-							}
+						"name":"response_fixed_request_tranfer_client",
+						"mac_address","10-7B-44-15-2D-B6",
+						"client_role","request",
+						"connected_server_address":"www.opendiylib.com",
+						"connected_server_port":19920,
+						"dhcp_address","192.168.188.150",
+						"dhcp_port":5555,
+						"nat_address":"",
+						"nat_port":-1
+						
+						//transfer server
+						"connected_transfer_server_address":"www.opendiylib.com",
+						"connected_transfer_server_port":19920,
+						"request_client_nat_address":"58.246.136.202",
+						"request_client_nat_port":50000,
+						"bonded_response_server_address","192.168.188.150"
+						"bonded_response_server_port":19920
 					}
 			} 
 		*/
@@ -331,40 +358,44 @@ public class TransferClient {
 				info.put("name", "response_request_client");
 				info.put("mac_address", mClientMacAddress);
 				info.put("client_role", ROLE_REQUEST);
-				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
-				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
-				info.put("dhcp_address", getLocalInetAddress());
-				info.put("dhcp_port", getLocalPort());
-				info.put("connected_transfer_server_address", mTransferConnection.getTransferServerAddress());
-				info.put("connected_transfer_server_port", mTransferConnection.getTransferServerPort());
-				//transfer server
 				info.put("connected_server_address", MainDemoClient.FIXED_HOST);
 				info.put("connected_server_port", getRemotePort());
+				info.put("dhcp_address", getLocalInetAddress());
+				info.put("dhcp_port", getLocalPort());
+				info.put("nat_address", getRemoteInetAddress());
+				info.put("nat_port", getRemotePort());
+				
+				//transfer server
+				info.put("connected_transfer_server_address", mTransferConnection.getTransferServerAddress());
+				info.put("connected_transfer_server_port", mTransferConnection.getTransferServerPort());
+				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
+				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
 				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
 				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
-				info.put("nat_address", "");
-				info.put("nat_port", -1);
-			} else {
+			} else if (ROLE_REPONSE.equals(mClientRole)) {
 				info.put("name", "response_response_client");
 				info.put("mac_address", mClientMacAddress);
 				info.put("client_role", ROLE_REPONSE);
-				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
-				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
-				info.put("dhcp_address", getLocalInetAddress());
-				info.put("dhcp_port", getLocalPort());
-				info.put("connected_transfer_server_address", MainDemoClient.FIXED_HOST);
-				info.put("connected_transfer_server_port", getRemotePort());
-				//local server
 				info.put("connected_server_address", getRemoteInetAddress());
 				info.put("connected_server_port", getRemotePort());
+				info.put("dhcp_address", getLocalInetAddress());
+				info.put("dhcp_port", getLocalPort());
+				info.put("nat_address", getRemoteInetAddress());
+				info.put("nat_port", getRemotePort());
+				
+				//transfer server
+				info.put("connected_transfer_server_address", MainDemoClient.FIXED_HOST);
+				info.put("connected_transfer_server_port", getRemotePort());
+				info.put("request_client_nat_address", mTransferConnection.getOrinalRequestNatAddress());
+				info.put("request_client_nat_port", mTransferConnection.getOrinalRequestNatPort());
 				info.put("bonded_response_server_address",mTransferConnection.getResponseServerAddress());
 				info.put("bonded_response_server_port", mTransferConnection.getResponseServerPort());
-				info.put("nat_address", "");
-				info.put("nat_port", -1);
+			} else {
+				Log.PrintLog(TAG, "initSocketInformation other role");
 			}
 			mClientInfomation = info;
 		}
-		printClientInfo();
+		Log.PrintLog(TAG, "initSocketInformation " + TransferClient.this);
 	}
 	
 	private void sendClientInfomation() {
@@ -386,11 +417,11 @@ public class TransferClient {
 		}
 	}
 	
-	private void printClientInfo() {
+	/*private void printClientInfo() {
 		if (mClientInfomation != null && mClientInfomation.length() > 0) {
 			Log.PrintLog(TAG, "printClientInfo:" + mClientInfomation);
 		}
-	}
+	}*/
 	
 	private void delayMs(long ms) {
 		try {
@@ -603,6 +634,9 @@ public class TransferClient {
 						mClientInfomation.put("nat_address", natAddress);
 						mClientInfomation.put("nat_port", natPort);
 						Log.PrintLog(TAG, "parseResult connected_to_fixed_server and update client info");
+						if (mTransferConnection.mRequestTransferClient == null) {
+							mTransferConnection.mRequestTransferClient = TransferClient.this;
+						}
 						if (mTransferConnection.mResponseTransferClient == null) {
 							mTransferConnection.startConnetToResponseServer();
 						} else {
@@ -646,6 +680,37 @@ public class TransferClient {
 			}
 		} catch (Exception e) {
 			Log.PrintError(TAG, "tryToGetInt getInt " + key + ", Exception " + e.getMessage());
+		}
+		return result;
+	}
+	
+	@Override
+	public String toString() {
+		String result = "unkown";
+		if (mClientInfomation != null) {
+			try {
+				result = mClientInfomation.getString("name");
+			} catch (Exception e) {
+				result = "unkown";
+				Log.PrintError(TAG, "toString  getString name Exception = " + e.getMessage());
+			}
+			try {
+				if ("unkown".equals(result)) {
+					result = mClientInfomation.getString("mac_address");
+				} else {
+					result = result + ":" + mClientInfomation.getString("mac_address");
+				}
+			} catch (Exception e) {
+				result = "unkown";
+				Log.PrintError(TAG, "toString  getString mac_address Exception = " + e.getMessage());
+			}
+			if (ROLE_REQUEST.equals(mClientRole)) {
+				result = result + "-" + mClientRole + "-" + getRemoteInetAddress() + ":" + getRemotePort() + "->" + getLocalInetAddress() + ":" + getLocalPort();
+			} else if (ROLE_REPONSE.equals(mClientRole)) {
+				result = result + "-" + mClientRole + "-" + getLocalInetAddress() + ":" + getLocalPort() + "->" + getRemoteInetAddress() + ":" + getRemotePort();
+			} else {
+				Log.PrintLog(TAG, "TransferClient other role");
+			}
 		}
 		return result;
 	}

@@ -47,7 +47,7 @@ public class TcpClient {
 
 		@Override
 		public void onTransferConnectionConnect(TransferConnection connection, JSONObject data) {
-			// TODO Auto-generated method stub
+			Log.PrintLog(TAG, "onTransferConnectionConnect connection=" + connection);
 			addTransferConnection(connection);
 			/*if (data != null && data.length() > 0) {
 				data.put("action", "connection_started");
@@ -57,7 +57,7 @@ public class TcpClient {
 
 		@Override
 		public void onTransferConnectionDisconnect(TransferConnection connection, JSONObject data) {
-			// TODO Auto-generated method stub
+			Log.PrintLog(TAG, "onTransferConnectionDisconnect connection=" + connection);
 			removeTransferConnection(connection);
 			/*if (data != null && data.length() > 0) {
 				data.put("action", "connection_stopped");
@@ -71,7 +71,7 @@ public class TcpClient {
 		@Override
 		public void run() {
 			// TODO Auto-generated method stub
-			Log.PrintLog(TAG, "start receive");
+			Log.PrintLog(TAG, "start receive " + toString());
 			try {
 				mInputStream = mClientSocket.getInputStream();
 			} catch (IOException e) {
@@ -97,16 +97,20 @@ public class TcpClient {
 				while (mIsRunning) {
 					try {
 					    while ((length = mSocketReader.read(buffer, 0, buffer.length)) != -1) {
-				    		inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
-					    	Log.PrintLog(TAG, "Received from client: " + inMsg);
+					    	try {
+				    			inMsg = new String(buffer, 0, length, Charset.forName("UTF-8")).trim();
+							} catch (Exception e) {
+								Log.PrintError(TAG, "receive Exception " + e.getMessage());
+								inMsg = null;
+							}
+					    	Log.PrintLog(TAG, "receive inMsg=" + inMsg);
 					    	outMsg = dealCommand(inMsg);
-					    	if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
+					    	/*if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
 						    	sendMessage(outMsg);
-					    	}
-					    	Log.PrintLog(TAG, "Received client deal: " + outMsg);
+					    	}*/
+					    	Log.PrintLog(TAG, "receive outMsg=" + outMsg);
 					    }
-					    Log.PrintLog(TAG, "client disconnect");
-					   
+					    //Log.PrintLog(TAG, "client disconnect");
 					} catch(Exception e) {
 						Log.PrintError(TAG, "receive Exception = " + e.getMessage());
 						break;
@@ -116,7 +120,7 @@ public class TcpClient {
 			} else {
 				Log.PrintError(TAG, "get stream error");
 			}
-			Log.PrintLog(TAG, "end receive");
+			Log.PrintLog(TAG, "end receive "  + toString());
 			dealClearWork();
 		}
 	};
@@ -431,16 +435,20 @@ public class TcpClient {
 					Log.PrintError(TAG, "dealCommand getString command Exception = " + e.getMessage());
 				}
 				switch (command) {
+					case "result":
+						Log.PrintLog(TAG, "dealCommand result");
+						result = parseResult(obj);
+						break;
 					case "start_connect_transfer":
+						Log.PrintLog(TAG, "dealCommand start_connect_transfer");
 						result = parseConnetToTransferServer(obj);
 						break;
 					case "status":
+						Log.PrintLog(TAG, "dealCommand status");
 						result = parseStatus(obj);
 						break;
-					case "result":
-						result = parseResult(obj);
-						break;
 					default:
+						Log.PrintLog(TAG, "dealCommand default");
 						break;
 				}
 			}
@@ -636,6 +644,12 @@ public class TcpClient {
 				case "transfer_server_not_found":
 					Log.PrintLog(TAG, "parseResult transfer_server_not_found");
 					break;
+				case "request_request_connected_to_transfer_server":
+					Log.PrintLog(TAG, "parseResult request_request_connected_to_transfer_server");
+					break;
+				case "request_response_connected_to_transfer_server":
+					Log.PrintLog(TAG, "parseResult request_response_connected_to_transfer_server");
+					break;
 				default:
 					break;
 			}
@@ -772,5 +786,29 @@ public class TcpClient {
 	public interface TransferConnectionCallback {
 		void onTransferConnectionConnect(TransferConnection connection, JSONObject data);
 		void onTransferConnectionDisconnect(TransferConnection connection, JSONObject data);
+	}
+	
+	@Override
+	public String toString() {
+		String result = "unkown";
+		if (mClientInfomation != null) {
+			try {
+				result = mClientInfomation.getString("name");
+			} catch (Exception e) {
+				result = "unkown";
+				Log.PrintError(TAG, "toString getString name Exception = " + e.getMessage());
+			}
+			try {
+				if ("unkown".equals(result)) {
+					result = mClientInfomation.getString("mac_address");
+				} else {
+					result = result + ":" + mClientInfomation.getString("mac_address");
+				}
+			} catch (Exception e) {
+				result = "unkown";
+				Log.PrintError(TAG, "toString getString mac_address Exception = " + e.getMessage());
+			}
+		}
+		return result;
 	}
 }
