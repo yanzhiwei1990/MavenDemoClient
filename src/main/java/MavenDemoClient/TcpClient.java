@@ -103,12 +103,12 @@ public class TcpClient {
 								Log.PrintError(TAG, "receive Exception " + e.getMessage());
 								inMsg = null;
 							}
-					    	Log.PrintLog(TAG, "receive inMsg=" + inMsg);
+					    	//Log.PrintLog(TAG, "receive inMsg=" + inMsg);
 					    	outMsg = dealCommand(inMsg);
 					    	/*if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
 						    	sendMessage(outMsg);
 					    	}*/
-					    	Log.PrintLog(TAG, "receive outMsg=" + outMsg);
+					    	//Log.PrintLog(TAG, "receive outMsg=" + outMsg);
 					    }
 					    //Log.PrintLog(TAG, "client disconnect");
 					} catch(Exception e) {
@@ -655,7 +655,7 @@ public class TcpClient {
 			}
 			try {
 				result = "no_need_feedback";
-				Log.PrintLog(TAG, "parseResult " + resultJson);
+				Log.PrintLog(TAG, "parseResult " + result);
 			} catch (Exception e) {
 				Log.PrintError(TAG, "parseResult deal result Exception = " + e.getMessage());
 			}

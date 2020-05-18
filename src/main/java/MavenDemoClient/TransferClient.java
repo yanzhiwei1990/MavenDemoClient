@@ -60,7 +60,6 @@ public class TransferClient {
 				Log.PrintError(TAG, "accept getOutputStream Exception = " + e.getMessage());
 			}
 			if (mInputStream != null && mOutputStream != null) {
-				Log.PrintLog(TAG, "receive 0000");
 				String inMsg = null;
 				String outMsg = null;
 				byte[] buffer = new byte[1024 * 1024];
@@ -77,12 +76,11 @@ public class TransferClient {
 				} else {
 					Log.PrintLog(TAG, "startListener other role");
 				}
-				Log.PrintLog(TAG, "receive sendClientInfomation " + mIsRunning);
 				while (mIsRunning) {
-					Log.PrintLog(TAG, "receive while isRunning");
+					//Log.PrintLog(TAG, "receive while isRunning " + TransferClient.this);
 					try {
 					    while (true) {
-					    	Log.PrintLog(TAG, "receive while true");
+					    	//Log.PrintLog(TAG, "receive while true");
 					    	length = mSocketReader.read(buffer, 0, buffer.length);
 					    	if (length == -1) {
 					    		Log.PrintLog(TAG, "receive length == -1");
@@ -106,30 +104,8 @@ public class TransferClient {
 					    	//Log.PrintLog(TAG, "receive 1111 " + mClientRole);
 					    	//Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
 					    	if ("unknown".equals(outMsg)) {
-					    		Log.PrintLog(TAG, "receive unknown " + TransferClient.this);
-					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.mResponseTransferClient == null) {
-					    			//Log.PrintLog(TAG, "receive 2222");
-					    			int count = 50;
-					    			while (mTransferConnection.mResponseTransferClient == null) {
-					    				Log.PrintLog(TAG, "wait response server" + TransferClient.this);
-					    				delayMs(100);
-					    				count--;
-					    				if (count < 0) {
-					    					Log.PrintLog(TAG, "wait response server 30s time out");
-					    					break;
-					    				}
-									}
-					    			if (count < 0) {
-					    				Log.PrintLog(TAG, "stop request client as time out" + TransferClient.this);
-					    				break;
-					    			} else {
-					    				Log.PrintLog(TAG, "request time out count = " + count);
-					    			}
-					    		} else {
-					    			Log.PrintLog(TAG, "receive found getToTransferClient" + TransferClient.this);
-					    		}
 					    		if (mTransferConnection.mRequestTransferClient != null && mTransferConnection.mResponseTransferClient != null) {
-					    			Log.PrintLog(TAG, "receive " + TransferClient.this);
+					    			Log.PrintLog(TAG, "receive transfer data = " + TransferClient.this);
 					    			switch (mClientRole) {
 						    			case ROLE_REQUEST:
 						    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
@@ -144,8 +120,30 @@ public class TransferClient {
 					    		} else {
 					    			Log.PrintLog(TAG, "receive not found both client " + TransferClient.this);
 					    		}
+					    	} else if ("wait_response_server".equals(outMsg)) {
+					    		Log.PrintLog(TAG, "receive wait_response_server");
+					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.mResponseTransferClient == null) {
+					    			Log.PrintLog(TAG, "request client=" + TransferClient.this);
+					    			int count = 50;
+					    			while (mTransferConnection.mResponseTransferClient == null) {
+					    				Log.PrintLog(TAG, "wait response server");
+					    				delayMs(100);
+					    				count--;
+					    				if (count < 0) {
+					    					Log.PrintLog(TAG, "wait response server 30s time out");
+					    					break;
+					    				}
+									}
+					    			if (count < 0) {
+					    				Log.PrintLog(TAG, "stop request client as time out");
+					    				break;
+					    			} else {
+					    				Log.PrintLog(TAG, "found response client = " + mTransferConnection.mResponseTransferClient);
+					    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
+					    			}
+					    		}
 					    	} else {
-					    		Log.PrintLog(TAG, "receive not unkown" + TransferClient.this);
+					    		Log.PrintLog(TAG, "receive not unkown " + TransferClient.this);
 					    	}
 					    }
 					    Log.PrintLog(TAG, "startListener disconnect " + TransferClient.this);
@@ -639,23 +637,22 @@ public class TransferClient {
 						}
 						if (mTransferConnection.mResponseTransferClient == null) {
 							mTransferConnection.startConnetToResponseServer();
+							result = "wait_response_server";
 						} else {
 							Log.PrintLog(TAG, "parseResult connected to responseServer already");
+							result = "no_need_feedback";
 						}
 					}
 					break;
 				case "request_request_connected_to_transfer_server":
-					
+					Log.PrintLog(TAG, "parseResult request_request_connected_to_transfer_server");
+					result = "no_need_feedback";
 					break;
 				default:
+					result = "no_need_feedback";
 					break;
 			}
-			try {
-				result = "no_need_feedback";
-				Log.PrintLog(TAG, "parseResult " + resultJson);
-			} catch (Exception e) {
-				Log.PrintError(TAG, "parseResult deal result Exception = " + e.getMessage());
-			}
+			Log.PrintLog(TAG, "parseResult " + result);
 		}
 		return result;
 	}
