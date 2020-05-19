@@ -145,6 +145,18 @@ public class TcpClient {
 	public void disconnectToServer() {
 		mIsRunning = false;
 		closeSocket();
+		stopStartedTransferServer();
+	}
+	
+	private void stopStartedTransferServer() {
+		Log.PrintLog(TAG, "closeAllTransferServer");
+		Iterator<TransferConnection> iterator = mTransferConnections.iterator();
+		while (iterator.hasNext()) {
+			TransferConnection connection = (TransferConnection)iterator.next();
+			connection.stopConnect();
+			connection = null;
+		}
+		mTransferConnections.clear();
 	}
 	
 	public void requestNewTransferConnection(JSONObject resuest) {
@@ -728,7 +740,7 @@ public class TcpClient {
 	}
 	
 	private void testRequestTransferServer() {
-		requestStartTransferServer("0.0.0.0", 19920, getLocalInetAddress(), 19920);
+		requestStartTransferServer("0.0.0.0", 19920, getLocalInetAddress(), 3389);
 	}
 	
 	private void requestStartTransferServer(String transferServerAddress, int transferServerPort, String responseServerAddress, int responseServerPort) {

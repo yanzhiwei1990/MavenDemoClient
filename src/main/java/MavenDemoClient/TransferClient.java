@@ -70,17 +70,15 @@ public class TransferClient {
 				initSocketInformation();
 				if (ROLE_REQUEST.equals(mClientRole)) {
 					sendClientInfomation();
-					mTransferConnection.mRequestTransferClient = TransferClient.this;
 				} else if (ROLE_REPONSE.equals(mClientRole)) {
 					mTransferConnection.mResponseTransferClient = TransferClient.this;
 				} else {
 					Log.PrintLog(TAG, "startListener other role");
 				}
 				while (mIsRunning) {
-					//Log.PrintLog(TAG, "receive while isRunning " + TransferClient.this);
+					Log.PrintLog(TAG, "receive while isRunning " + TransferClient.this);
 					try {
 					    while (true) {
-					    	//Log.PrintLog(TAG, "receive while true");
 					    	length = mSocketReader.read(buffer, 0, buffer.length);
 					    	if (length == -1) {
 					    		Log.PrintLog(TAG, "receive length == -1");
@@ -94,18 +92,13 @@ public class TransferClient {
 									Log.PrintError(TAG, "parse first 256 bytes error");
 								}
 					    		outMsg = dealCommand(inMsg);
-					    		/*if (!"no_need_feedback".equals(outMsg) && !"unknown".equals(outMsg)) {
-					    			Log.PrintLog(TAG, "Received dealt outMsg = " + outMsg);
-							    	sendMessage(outMsg);
-					    		}*/
 					    	} else {
 					    		outMsg = "unknown";
 					    	}
-					    	//Log.PrintLog(TAG, "receive 1111 " + mClientRole);
-					    	//Log.PrintLog(TAG, "length = " + length + ", mClientInfomation = " + mClientInfomation + ",outMsg = " + outMsg);
+					    	//Log.PrintLog(TAG, "length = " + length + ", inMsg = " + inMsg + ",outMsg = " + outMsg);
 					    	if ("unknown".equals(outMsg)) {
 					    		if (mTransferConnection.mRequestTransferClient != null && mTransferConnection.mResponseTransferClient != null) {
-					    			Log.PrintLog(TAG, "receive transfer data = " + TransferClient.this);
+					    			//Log.PrintLog(TAG, "receive transfer data = " + TransferClient.this);
 					    			switch (mClientRole) {
 						    			case ROLE_REQUEST:
 						    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
@@ -124,10 +117,10 @@ public class TransferClient {
 					    		Log.PrintLog(TAG, "receive wait_response_server");
 					    		if (ROLE_REQUEST.equals(mClientRole) && mTransferConnection.mResponseTransferClient == null) {
 					    			Log.PrintLog(TAG, "request client=" + TransferClient.this);
-					    			int count = 50;
+					    			int count = 5000;
 					    			while (mTransferConnection.mResponseTransferClient == null) {
-					    				Log.PrintLog(TAG, "wait response server");
-					    				delayMs(100);
+					    				//Log.PrintLog(TAG, "wait response server");
+					    				delayMs(1);
 					    				count--;
 					    				if (count < 0) {
 					    					Log.PrintLog(TAG, "wait response server 30s time out");
@@ -139,7 +132,7 @@ public class TransferClient {
 					    				break;
 					    			} else {
 					    				Log.PrintLog(TAG, "found response client = " + mTransferConnection.mResponseTransferClient);
-					    				mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
+					    				//mTransferConnection.mResponseTransferClient.transferBuffer(buffer, 0, length);
 					    			}
 					    		}
 					    	} else {
@@ -447,6 +440,17 @@ public class TransferClient {
 	
 	private void dealClearWork() {
 		Log.PrintLog(TAG, "closeStream mIsRunning = " + mIsRunning);
+		if (ROLE_REQUEST.equals(mClientRole)) {
+			if (mTransferConnection.mResponseTransferClient != null) {
+				mTransferConnection.mResponseTransferClient.disconnectToServer();
+			}
+		} else if (ROLE_REPONSE.equals(mClientRole)) {
+			if (mTransferConnection.mRequestTransferClient != null) {
+				mTransferConnection.mRequestTransferClient.disconnectToServer();
+			}
+		} else {
+			Log.PrintLog(TAG, "dealClearWork other role");
+		}
 		if (mIsRunning) {
 			closeSocket();
 			closeStream();
@@ -454,7 +458,9 @@ public class TransferClient {
 		} else {
 			closeStream();
 		}
-		mExecutorService.shutdown();
+		if (mTransferConnection != null) {
+			mTransferConnection.stopConnect();
+		}
 	}
 	
 	private void closeStream() {
